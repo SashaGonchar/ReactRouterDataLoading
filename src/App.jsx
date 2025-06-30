@@ -2,51 +2,75 @@ import {
     createBrowserRouter,
     RouterProvider,
     Link,
-    useLoaderData,
-    Outlet,
-    useNavigate,
-    useNavigation
+    Form,
+    useNavigation,
+    useActionData,
+    useRouteError,
 } from "react-router-dom";
 
-const fetchData = async () => {
-    const res = await fetch("https://jsonplaceholder.typicode.com/posts");
-    if(!res.ok){
-        throw new Error("Failed to fetch posts");
+const createPost = async ({ request }) => {
+    console.log(request);
+    const formData = await request.formData();
+    const title = formData.get("title");
+    const response = await fetch("https://jsonplaceholder.typicode.com/posts", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ title }),
+    });
+
+    if (!response.ok) {
+        throw new Error("Failed to create a post");
     }
-    return res.json();
+
+    const result = await response.json();
+    console.log(result);
+    return result;
 };
-
-function Layout() {
-    const navigation = useNavigation()
-    return <div>{navigation.state === "loading" && <p>Loading</p>}
-        <Outlet/>
-    </div>
-
-}
 
 function Home() {
     return (
         <div>
-            <h1>Welcome to the Home Page</h1>
+            <h1>Home Page</h1>
             <p>
-                Go to the <Link to="/posts">Posts</Link> page to view the list of posts.
+                Navigate to the <Link to="/create">Create Post</Link> page.
             </p>
         </div>
     );
 }
 
-function Posts() {
-    const posts = useLoaderData()
-    console.log(posts)
+function CreatePost() {
+    const actionData = useActionData();
+    const navigation = useNavigation();
 
     return (
         <div>
-            <h1>Posts</h1>
-            <ul>
-                { posts.map((post) => (
-                    <li key={post.id}>{post.title}</li>
-                ))}
-            </ul>
+            <h1>Create a Post</h1>
+            <Form method="post" action="/create">
+                <input type="text" name="title" placeholder="Title" required />
+                <button type="submit" disabled={navigation.state === "submitting"}>
+                    {navigation.state === "submitting" ? "Sending..." : "Create Post"}
+                </button>
+            </Form>
+            {actionData && (
+                <div style={{ marginTop: "1rem", color: "green" }}>
+                    <strong>Post created successfully!</strong>
+                    <br />
+                    ID: {actionData.id}, Title: {actionData.title}
+                </div>
+            )}
+            <Link to="/">Back to Home</Link>
+        </div>
+    );
+}
+
+function ErrorBoundary() {
+    const error = useRouteError();
+    return (
+        <div>
+            <h1>Error</h1>
+            <p>{error.message || "Something went wrong"}</p>
             <Link to="/">Go back to Home</Link>
         </div>
     );
@@ -55,33 +79,17 @@ function Posts() {
 const router = createBrowserRouter([
     {
         path: "/",
-        element:<Layout/>,
-        children:[{
-            index: true,
-            element: <Home />, // Home page
-        },
-            {
-                path: "/posts",
-                element: <Posts />,
-                loader: fetchData,
-            },
-            {
-                path: "*",
-                element: <h1>404: Page Not Found</h1>, // Component for non-existent routes
-            },],
+        element: <Home />,
     },
     {
-        path: "/",
-        element: <Home />, // Home page
-    },
-    {
-        path: "/posts",
-        element: <Posts />,
-        loader: fetchData,
+        path: "/create",
+        element: <CreatePost />,
+        action: createPost,
+        errorElement: <ErrorBoundary />,
     },
     {
         path: "*",
-        element: <h1>404: Page Not Found</h1>, // Component for non-existent routes
+        element: <h1>404: Page Not Found</h1>,
     },
 ]);
 
